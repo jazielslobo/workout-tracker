@@ -41,7 +41,8 @@ function downloadTextFile(filename, content, type = 'application/json') {
 
 function csvEscape(value = '') {
   const stringValue = String(value ?? '');
-  if (/[",;\n\r]/.test(stringValue)) {
+  if (/[",
+;]/.test(stringValue)) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;

@@ -1,20 +1,20 @@
-# Jeferson Personal — v10 estável
+# Jeferson Personal — v1.3.0
 
-Aplicativo web mobile-first em Framework7, HTML, CSS e JavaScript puro, com persistência local em IndexedDB e funcionamento como site estático.
+Aplicativo web mobile-first em Framework7, HTML, CSS e JavaScript puro, com persistência local em IndexedDB, funcionamento como site estático e suporte a instalação como PWA.
 
 ## Visão geral da arquitetura
 
-O projeto está dividido em camadas simples:
+A arquitetura foi mantida modular para evitar acoplamento entre interface, regras de negócio e persistência local.
 
-- `index.html`: shell principal do app
-- `pages/`: páginas HTML carregadas por rota
+- `index.html`: shell principal do aplicativo
+- `pages/`: páginas HTML carregadas pelo roteador do Framework7
 - `css/`: tokens visuais e estilos globais
-- `js/app.js`: bootstrap do app
-- `js/routes.js`: rotas do Framework7
+- `js/app.js`: bootstrap da aplicação
+- `js/routes.js`: definição das rotas principais
 - `js/db/`: IndexedDB, repositório e seed inicial
-- `js/modules/`: funcionalidades por domínio
-- `js/utils/`: constantes e formatadores
-- `assets/`: ícones e imagens
+- `js/modules/`: módulos por domínio de uso
+- `js/utils/`: constantes, formatadores e utilitários de agenda
+- `assets/`: ícones do PWA
 
 ## Estrutura de pastas
 
@@ -22,16 +22,37 @@ O projeto está dividido em camadas simples:
 index.html
 manifest.json
 service-worker.js
+README.md
 css/
+  app.css
+  variables.css
 js/
+  app.js
+  routes.js
   db/
+    indexeddb.js
+    repository.js
+    seedData.js
   modules/
+    backup.js
+    crud.js
+    history.js
+    pages.js
+    pwa.js
+    schedule.js
+    ui.js
+    whatsapp.js
+    workoutTemplates.js
   utils/
+    constants.js
+    formatters.js
+    scheduleSlots.js
 pages/
 assets/
+  icons/
 ```
 
-## Como abrir e rodar
+## Como abrir e rodar o projeto
 
 ### Opção 1 — Python
 
@@ -49,22 +70,17 @@ http://localhost:8000
 
 Pode usar Live Server.
 
-## Importante ao testar versões novas
+## Como publicar no GitHub Pages
 
-Se você já abriu versões anteriores deste projeto, limpe o navegador antes de testar:
-
-1. DevTools → Aplicativo / Application
-2. Service Workers → Unregister
-3. Storage / Armazenamento → Clear site data
-4. Recarregue com `Ctrl + F5`
-
-Na v10, o service worker **não é registrado em localhost**, justamente para evitar cache antigo durante desenvolvimento.
+O projeto já está preparado para rodar em subpasta com caminhos relativos. Se publicar em um repositório como `workout-tracker`, basta ativar o Pages usando a branch `main` na pasta raiz.
 
 ## Como o PWA funciona
 
-- `manifest.json` define nome, ícones, tema e modo standalone
-- `service-worker.js` está preparado para uso em ambiente publicado
-- em `localhost`, o service worker fica desativado para reduzir problemas de cache durante testes
+- `manifest.json` define nome, ícones, tema, `start_url` e `scope` relativos
+- `service-worker.js` faz cache do shell do app para publicação em HTTPS
+- em `localhost`, o app **não registra** service worker e ainda tenta limpar registros antigos, evitando cache preso durante testes
+- no Android, a instalação costuma aparecer automaticamente no Chrome
+- no iPhone, a instalação é feita pelo Safari em **Compartilhar → Adicionar à Tela de Início**
 
 ## Como o IndexedDB foi organizado
 
@@ -80,32 +96,38 @@ Stores principais:
 - `workoutLogs`
 - `settings`
 
-Há uma camada reutilizável em `js/db/repository.js` com funções para:
+A store `settings` guarda preferências e a versão do seed aplicada.
+
+### Camada de acesso a dados
+
+`js/db/repository.js` concentra funções reutilizáveis para:
 
 - adicionar
-- editar
+- salvar/substituir
+- editar parcialmente
 - remover
 - buscar por id
 - listar todos
-- filtrar
+- filtrar registros
+- contar registros
 - limpar store
 
 ## Principais fluxos do usuário
 
-### Dashboard do dia
-- usa dia e hora atuais do dispositivo
-- separa próximos treinos e quem já treinou
-- agrupa por horário
-- abre detalhes do horário
+### Início / Dashboard do dia
+- usa o dia e o horário atuais do dispositivo
+- separa **Próximos treinos** de **Já treinaram hoje**
+- considera logs concluídos do dia
+- agrupa múltiplos alunos por horário
 
 ### Alunos
 - criar, editar, excluir, inativar e reativar
-- histórico individual
-- acesso aos treinos do aluno
+- acessar histórico individual
+- acessar treinos do aluno
 
 ### Academias
 - criar, editar e excluir
-- busca por nome
+- busca por nome e endereço
 
 ### Exercícios
 - criar, editar e excluir
@@ -114,15 +136,21 @@ Há uma camada reutilizável em `js/db/repository.js` com funções para:
 
 ### Agenda
 - agenda recorrente por dia da semana
+- cada dia pode ter **horário próprio**
 - alerta para conflito de horário
 - suporte a múltiplos alunos no mesmo horário
 
 ### Treino do dia
-- mostra todos os alunos do horário
-- permite editar cargas
+- abre todos os alunos daquele horário
+- mostra o treino do dia por aluno
+- permite editar cargas rapidamente
 - permite concluir treino
 - grava log no IndexedDB
 - gera resumo para WhatsApp
+
+### Histórico
+- mostra os logs do aluno do mais recente para o mais antigo
+- destaca o último peso usado por exercício
 
 ### Configurações
 - exportação de backup JSON
@@ -130,50 +158,50 @@ Há uma camada reutilizável em `js/db/repository.js` com funções para:
 - exportação CSV de alunos
 - exportação CSV de academias
 
-## Checklist técnico revisado na v10
+## Dados seed
 
-### Estrutura e carregamento
-- [x] Todos os arquivos JavaScript passaram em verificação de sintaxe
-- [x] Imports locais principais revisados
-- [x] Shell inicial do app carrega sem depender de backend
-- [x] Bootstrap reorganizado para inicializar IndexedDB antes da renderização principal
-- [x] Fallback fatal amigável quando houver erro crítico
+O seed inicial já inclui:
 
-### Persistência
-- [x] Inicialização do IndexedDB revisada
-- [x] Seed inicial mantido
-- [x] Stores principais revisadas
+- base robusta de exercícios de musculação
+- academias reais em Aracaju
+- Smart Fit Jardins como academia principal de Jaziel e Mariângela
+- treinos e agendas de exemplo
+- compatibilidade com dados antigos de agenda e com o novo formato por slots
 
-### Fluxos funcionais revisados no código
-- [x] Dashboard do dia
-- [x] CRUD de alunos
-- [x] CRUD de academias
-- [x] CRUD de exercícios
-- [x] Agenda recorrente
-- [x] Horários simultâneos
-- [x] Detalhe do horário
-- [x] Histórico do aluno
-- [x] Backup e restauração
-- [x] Modelos de treino por aluno e dia da semana
+## O que foi refinado nesta revisão final
 
-### Estabilidade de desenvolvimento
-- [x] Service worker desativado em localhost
-- [x] Mensagens de erro globais registradas no console
-- [x] Re-renderização inicial reforçada no Framework7
+### Visual
+- melhor consistência de cards, formulários e botões
+- melhor hierarquia de títulos e textos de apoio
+- estados vazios e feedbacks visuais mais consistentes
+- reforço do visual com inspiração iOS
+
+### Funcional
+- revisão dos fluxos principais
+- revisão do sincronismo entre UI e IndexedDB
+- revisão do dashboard e do fluxo de conclusão de treino
+- revisão de histórico e backup/importação
+
+### Robustez
+- tratamento de erros no bootstrap e na renderização de páginas
+- limpeza de service workers antigos em ambiente local
+- revisão final do manifest e do service worker
+- revisão dos dados mock e seed
+
+## Pendências e limitações atuais
+
+- o Framework7 continua vindo de CDN
+- não há testes automatizados
+- a restauração do backup faz sobrescrita total
+- ainda não existe sincronização entre dispositivos
+- um construtor visual mais avançado de ficha de treino ainda pode evoluir
 
 ## Sugestões reais de próximas evoluções
 
-- construtor visual mais avançado para ficha de treino
-- duplicar treino de um dia para outro
-- reordenar exercícios por drag and drop
-- filtros por período no histórico
-- exportação do histórico por aluno
+- empacotar Framework7 localmente para eliminar dependência de CDN
+- adicionar duplicação de treino de um dia para outro
+- permitir reordenação de exercícios por arrastar
+- adicionar filtros por período no histórico
+- exportar histórico por aluno
 - sincronização futura em nuvem
-- versão totalmente offline sem CDN
-
-## Limitações atuais
-
-- a biblioteca Framework7 ainda vem de CDN
-- não há testes automatizados
-- não há sincronização entre dispositivos
-- o backup atual faz restauração por sobrescrita total
+- suporte a anexos ou fotos de evolução

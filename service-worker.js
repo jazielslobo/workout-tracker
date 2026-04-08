@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jeferson-personal-shell-v10';
+const CACHE_NAME = 'jeferson-personal-shell-v13';
 const APP_SHELL = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const APP_SHELL = [
   './js/modules/ui.js',
   './js/utils/constants.js',
   './js/utils/formatters.js',
+  './js/utils/scheduleSlots.js',
   './pages/home.html',
   './pages/agenda.html',
   './pages/alunos.html',

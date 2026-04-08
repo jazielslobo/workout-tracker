@@ -1,5 +1,9 @@
 let deferredInstallPrompt = null;
 
+function isStandaloneMode() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 function showInstallBanner() {
   const banner = document.querySelector('[data-install-banner]');
   if (!banner) return;
@@ -21,6 +25,19 @@ function shouldRegisterServiceWorker() {
 }
 
 export async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    } catch (error) {
+      console.warn('Não foi possível limpar service workers locais antigos:', error);
+    }
+    return;
+  }
+
   if (!shouldRegisterServiceWorker()) return;
 
   window.addEventListener('load', async () => {
@@ -34,6 +51,7 @@ export async function registerServiceWorker() {
 
 export function setupInstallPrompt(app) {
   window.addEventListener('beforeinstallprompt', (event) => {
+    if (isStandaloneMode()) return;
     event.preventDefault();
     deferredInstallPrompt = event;
     showInstallBanner();

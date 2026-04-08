@@ -1,7 +1,8 @@
 import { OBJECT_STORES, STATUS, WEEK_DAYS } from '../utils/constants.js';
 import { addRecord, deleteRecord, filterRecords, generateId, getAllRecords, updateRecord } from '../db/repository.js';
 import { openWhatsAppForWorkoutSummary } from './whatsapp.js';
-import { createGoogleMapsUrl, createWazeUrl, digitsOnly, formatIsoDate, formatPhone, getWeekDayLabel } from '../utils/formatters.js';
+import { createGoogleMapsUrl, createWazeUrl, formatIsoDate, formatPhone, getWeekDayLabel } from '../utils/formatters.js';
+import { buildSchedulePayload, ensureTimeValue, expandSchedulesForDay, getScheduleSlots, isValidTime } from '../utils/scheduleSlots.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -91,33 +92,6 @@ function createPopup({ title, subtitle, content, submitLabel, submitColor = 'fil
   return popup;
 }
 
-function buildDayCheckboxes(selectedDays = []) {
-  return `
-    <div class="jp-weekday-grid">
-      ${WEEK_DAYS.map((day) => `
-        <label class="jp-weekday-check ${selectedDays.includes(day.key) ? 'is-active' : ''}">
-          <input type="checkbox" name="diasSemana" value="${day.key}" ${selectedDays.includes(day.key) ? 'checked' : ''} />
-          <span>${day.short}</span>
-          <small>${day.label}</small>
-        </label>
-      `).join('')}
-    </div>
-  `;
-}
-
-function ensureTimeValue(value = '') {
-  if (!value) return '';
-  const clean = value.replace(/[^\d:]/g, '');
-  if (/^\d{2}:\d{2}$/.test(clean)) return clean;
-  const digits = clean.replace(/\D/g, '').slice(0, 4);
-  if (digits.length < 4) return clean;
-  return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
-}
-
-function isValidTime(value = '') {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
-}
-
 function buildWorkoutView({ template, exercisesMap, existingLog }) {
   if (!template) {
     return '<div class="jp-mini-empty">Treino do dia ainda não configurado para este aluno.</div>';
@@ -187,10 +161,12 @@ async function saveLogPayload(payload) {
 
 export async function openScheduleForm({ schedule = null, students = [], gyms = [], initialDayKey = 'monday', onSaved }) {
   const isEdit = Boolean(schedule);
-  const selectedDays = schedule?.diasSemana?.length ? schedule.diasSemana : [initialDayKey];
+  const slotsMap = Object.fromEntries(getScheduleSlots(schedule).map((slot) => [slot.dayKey, slot.horario]));
+  if (!Object.keys(slotsMap).length && initialDayKey) slotsMap[initialDayKey] = '';
+
   createPopup({
-    title: isEdit ? 'Editar horário recorrente' : 'Nova agenda recorrente',
-    subtitle: isEdit ? 'Ajuste aluno, dias, horário e local' : 'Cadastre o horário semanal e confirme treinos juntos quando houver conflito',
+    title: isEdit ? 'Editar agenda recorrente' : 'Nova agenda recorrente',
+    subtitle: isEdit ? 'Agora cada dia pode ter seu próprio horário.' : 'Cadastre os dias e horários recorrentes do aluno.',
     submitLabel: isEdit ? 'Salvar agenda' : 'Criar agenda',
     content: `
       <section class="jp-form-section jp-card jp-panel-card">
@@ -203,19 +179,11 @@ export async function openScheduleForm({ schedule = null, students = [], gyms = 
             </select>
           </label>
           <label class="jp-field">
-            <span>Horário *</span>
-            <input name="horario" type="time" value="${escapeHtml(schedule?.horario || '')}" required />
-          </label>
-          <label class="jp-field">
             <span>Academia *</span>
             <select name="gymId" required>
               <option value="">Selecione a academia</option>
               ${gyms.map((gym) => `<option value="${gym.id}" ${schedule?.gymId === gym.id ? 'selected' : ''}>${escapeHtml(gym.nome)}</option>`).join('')}
             </select>
-          </label>
-          <label class="jp-field jp-field-full">
-            <span>Dias da semana *</span>
-            ${buildDayCheckboxes(selectedDays)}
           </label>
           <label class="jp-field">
             <span>Status da agenda</span>
@@ -224,86 +192,113 @@ export async function openScheduleForm({ schedule = null, students = [], gyms = 
               <option value="false" ${schedule?.ativo === false ? 'selected' : ''}>Inativa</option>
             </select>
           </label>
+          <div class="jp-field jp-field-full">
+            <span>Dias e horários *</span>
+            <div class="jp-weekday-time-grid">
+              ${WEEK_DAYS.map((day) => {
+                const checked = Object.prototype.hasOwnProperty.call(slotsMap, day.key);
+                const value = checked ? slotsMap[day.key] : '';
+                return `
+                  <label class="jp-weekday-time-row ${checked ? 'is-active' : ''}">
+                    <span class="jp-weekday-time-check">
+                      <input type="checkbox" name="diasSemana" value="${day.key}" ${checked ? 'checked' : ''} />
+                      <strong>${day.label}</strong>
+                    </span>
+                    <input type="time" name="horario_${day.key}" value="${escapeHtml(value)}" ${checked ? '' : 'disabled'} />
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
           <label class="jp-field jp-field-full">
             <span>Observações</span>
-            <textarea name="observacoes" rows="4" placeholder="Ex.: treino em conjunto, ajustes do horário, observações de logística">${escapeHtml(schedule?.observacoes || '')}</textarea>
+            <textarea name="observacoes" rows="4" placeholder="Ex.: treino em conjunto, ajustes de logística, observações gerais">${escapeHtml(schedule?.observacoes || '')}</textarea>
           </label>
         </div>
       </section>
     `,
+    afterOpen: (popupEl) => {
+      popupEl.querySelectorAll('input[name="diasSemana"]').forEach((input) => {
+        const row = input.closest('.jp-weekday-time-row');
+        const timeInput = row?.querySelector(`input[name="horario_${input.value}"]`);
+        input.addEventListener('change', () => {
+          row?.classList.toggle('is-active', input.checked);
+          if (timeInput) {
+            timeInput.disabled = !input.checked;
+            if (!input.checked) timeInput.value = '';
+          }
+        });
+      });
+    },
     onSubmit: async (formData, popupEl) => {
       const studentId = String(formData.get('studentId') || '').trim();
-      const horario = ensureTimeValue(String(formData.get('horario') || '').trim());
       const gymId = String(formData.get('gymId') || '').trim();
       const observacoes = String(formData.get('observacoes') || '').trim();
       const ativo = String(formData.get('ativo') || 'true') === 'true';
-      const diasSemana = Array.from(popupEl.querySelectorAll('input[name="diasSemana"]:checked')).map((item) => item.value);
+      const selectedDays = Array.from(popupEl.querySelectorAll('input[name="diasSemana"]:checked')).map((item) => item.value);
+      const slots = selectedDays.map((dayKey) => ({
+        dayKey,
+        horario: ensureTimeValue(String(formData.get(`horario_${dayKey}`) || '').trim()),
+        gymId
+      }));
 
       if (!studentId) throw new Error('Selecione o aluno da agenda.');
       if (!gymId) throw new Error('Selecione a academia do horário.');
-      if (!isValidTime(horario)) throw new Error('Informe um horário válido no formato HH:MM.');
-      if (!diasSemana.length) throw new Error('Selecione pelo menos um dia da semana.');
+      if (!slots.length) throw new Error('Selecione pelo menos um dia da semana.');
+      if (slots.some((slot) => !isValidTime(slot.horario))) {
+        throw new Error('Cada dia selecionado precisa ter um horário válido no formato HH:MM.');
+      }
 
-      const selectedStudent = students.find((student) => student.id === studentId);
-      if (!selectedStudent) throw new Error('Aluno não encontrado.');
+      const duplicateSlots = slots.filter((slot, index) => slots.findIndex((other) => other.dayKey === slot.dayKey && other.horario === slot.horario) !== index);
+      if (duplicateSlots.length) {
+        throw new Error('Há horários duplicados dentro da mesma agenda. Revise os dias e horários selecionados.');
+      }
 
       const [allSchedules, allStudents] = await Promise.all([
         getAllRecords(OBJECT_STORES.schedules),
         getAllRecords(OBJECT_STORES.students)
       ]);
-      const studentsMap = Object.fromEntries(allStudents.map((item) => [item.id, item]));
+      const activeStudentsMap = Object.fromEntries(allStudents.filter((item) => item.status === STATUS.ACTIVE).map((item) => [item.id, item]));
 
-      const conflicts = allSchedules.filter((item) => {
-        if (schedule && item.id === schedule.id) return false;
-        if (!item.ativo || !ativo) return false;
-        if (item.horario !== horario) return false;
-        if (!item.diasSemana.some((day) => diasSemana.includes(day))) return false;
-        const otherStudent = studentsMap[item.studentId];
-        return otherStudent?.status === STATUS.ACTIVE;
+      const conflicts = [];
+      allSchedules.forEach((item) => {
+        if (schedule && item.id === schedule.id) return;
+        if (!item.ativo) return;
+        if (!activeStudentsMap[item.studentId]) return;
+        getScheduleSlots(item).forEach((existingSlot) => {
+          if (slots.some((slot) => slot.dayKey === existingSlot.dayKey && slot.horario === existingSlot.horario)) {
+            conflicts.push({ studentId: item.studentId, dayKey: existingSlot.dayKey, horario: existingSlot.horario });
+          }
+        });
       });
 
       if (conflicts.length) {
-        const label = conflicts.length === 1 ? 'Já existe 1 aluno cadastrado neste horário. Deseja confirmar que eles treinarão juntos?' : `Já existem ${conflicts.length} alunos cadastrados neste horário. Deseja confirmar que eles treinarão juntos?`;
-        const confirmed = await confirmDialog(label);
+        const uniqueStudents = new Set(conflicts.map((item) => item.studentId));
+        const labels = conflicts.map((item) => `${getWeekDayLabel(item.dayKey)} às ${item.horario}`);
+        const confirmed = await confirmDialog(`Já ${uniqueStudents.size === 1 ? 'existe 1 aluno cadastrado' : `existem ${uniqueStudents.size} alunos cadastrados`} em um ou mais horários selecionados (${labels.join(', ')}). Deseja confirmar que eles treinarão juntos?`);
         if (!confirmed) return false;
       }
 
-      const payload = {
-        studentId,
-        diasSemana,
-        horario,
-        gymId,
-        observacoes,
-        ativo,
-        updatedAt: nowIso()
-      };
-
-      if (isEdit) {
+      const payload = buildSchedulePayload({ existingSchedule: schedule, studentId, gymId, observacoes, ativo, slots });
+      if (schedule?.id) {
         await updateRecord(OBJECT_STORES.schedules, schedule.id, payload);
         showToast('Agenda atualizada com sucesso.');
       } else {
         await addRecord(OBJECT_STORES.schedules, {
-          id: generateId('schedule'),
           ...payload,
-          createdAt: nowIso()
+          id: generateId('schedule'),
+          createdAt: nowIso(),
+          updatedAt: nowIso()
         });
         showToast('Agenda criada com sucesso.');
       }
-
       await onSaved?.();
-    },
-    afterOpen: (popupEl) => {
-      popupEl.querySelectorAll('.jp-weekday-check input').forEach((input) => {
-        input.addEventListener('change', () => {
-          input.closest('.jp-weekday-check')?.classList.toggle('is-active', input.checked);
-        });
-      });
     }
   });
 }
 
 export async function deleteSchedule(schedule, onSaved) {
-  const confirmed = await confirmDialog('Excluir este horário recorrente?');
+  const confirmed = await confirmDialog('Excluir esta agenda recorrente?');
   if (!confirmed) return;
   await deleteRecord(OBJECT_STORES.schedules, schedule.id);
   showToast('Agenda excluída com sucesso.');
@@ -319,7 +314,7 @@ export async function openWorkoutLoadEditor({ student, schedule, dayKey, templat
   const existingLoads = Object.fromEntries((existingLog?.exerciciosRealizados || []).map((item) => [item.exerciseId, item.carga || '']));
 
   createPopup({
-    title: `Cargas do dia`,
+    title: 'Cargas do dia',
     subtitle: `${student.nome} · ${getWeekDayLabel(dayKey)} · ${schedule.horario}`,
     submitLabel: 'Salvar cargas',
     content: `
@@ -329,7 +324,7 @@ export async function openWorkoutLoadEditor({ student, schedule, dayKey, templat
             <label class="jp-field jp-field-full">
               <span>${index + 1}. ${escapeHtml(exercisesMap[item.exerciseId]?.nome || 'Exercício')}</span>
               <input name="carga_${item.exerciseId}" type="text" value="${escapeHtml(existingLoads[item.exerciseId] || item.carga || '')}" placeholder="Ex.: 20kg / halter 12kg" />
-              <small>${escapeHtml(item.series || '-') } séries · ${escapeHtml(item.repeticoes || '-')} reps</small>
+              <small>${escapeHtml(item.series || '-')} séries · ${escapeHtml(item.repeticoes || '-')} reps</small>
             </label>
           `).join('')}
           <label class="jp-field jp-field-full">
@@ -347,7 +342,7 @@ export async function openWorkoutLoadEditor({ student, schedule, dayKey, templat
         studentId: student.id,
         dayKey,
         horario: schedule.horario,
-        gymId: schedule.gymId,
+        gymId: schedule.slotGymId || schedule.gymId,
         template,
         exercisesMap,
         cargas,
@@ -376,7 +371,7 @@ export async function completeWorkoutForToday({ student, schedule, dayKey, templ
     studentId: student.id,
     dayKey,
     horario: schedule.horario,
-    gymId: schedule.gymId,
+    gymId: schedule.slotGymId || schedule.gymId,
     template,
     exercisesMap,
     cargas: existingLoads,
@@ -390,8 +385,8 @@ export async function completeWorkoutForToday({ student, schedule, dayKey, templ
 }
 
 export function openTimeSlotDetails({ dayKey, horario, data, onUpdated, source = 'dashboard' }) {
-  const schedules = data.schedules
-    .filter((item) => item.ativo && item.horario === horario && item.diasSemana.includes(dayKey))
+  const schedules = expandSchedulesForDay(data.schedules.filter((item) => item.ativo), dayKey)
+    .filter((item) => item.horario === horario)
     .filter((item) => data.studentsMap[item.studentId]?.status === STATUS.ACTIVE)
     .sort((a, b) => (data.studentsMap[a.studentId]?.nome || '').localeCompare(data.studentsMap[b.studentId]?.nome || '', 'pt-BR'));
 
@@ -403,7 +398,7 @@ export function openTimeSlotDetails({ dayKey, horario, data, onUpdated, source =
 
     return schedules.map((schedule) => {
       const student = data.studentsMap[schedule.studentId];
-      const gym = data.gymsMap[schedule.gymId];
+      const gym = data.gymsMap[schedule.slotGymId || schedule.gymId];
       const template = data.templates.find((item) => item.studentId === schedule.studentId && item.diaSemana === dayKey);
       const enrichedTemplate = template ? {
         ...template,
@@ -498,7 +493,7 @@ export function openTimeSlotDetails({ dayKey, horario, data, onUpdated, source =
         await completeWorkoutForToday({ student, schedule, dayKey, template, exercisesMap: data.exercisesMap, existingLog, onSaved: rerender });
       }
       if (whatsappButton) {
-        const gym = data.gymsMap[schedule.gymId];
+        const gym = data.gymsMap[schedule.slotGymId || schedule.gymId];
         openWhatsAppForWorkoutSummary({ student, log: existingLog, gym });
       }
     });

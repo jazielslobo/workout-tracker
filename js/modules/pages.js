@@ -1,6 +1,7 @@
 import { OBJECT_STORES, STATUS, WEEK_DAYS } from '../utils/constants.js';
 import { countRecords, getAllRecords, getRecordById } from '../db/repository.js';
 import { createGoogleMapsUrl, createWazeUrl, formatDateLabel, formatIsoDate, formatPhone, formatTimeLabel, getCurrentTimeValue, getCurrentWeekDayKey, getWeekDayLabel, normalizeText, sortByName } from '../utils/formatters.js';
+import { expandSchedulesForDay, getScheduleSlots } from '../utils/scheduleSlots.js';
 import { createWhatsAppLink, deleteExercise, deleteGym, deleteStudent, openExerciseForm, openGymForm, openStudentForm, toggleStudentStatus } from './crud.js';
 import { deleteSchedule, openScheduleForm, openTimeSlotDetails } from './schedule.js';
 import { openWorkoutTemplatesManager } from './workoutTemplates.js';
@@ -98,15 +99,15 @@ function buildDashboardEntries(data, now = new Date()) {
     data.students.filter((student) => student.status === STATUS.ACTIVE).map((student) => [student.id, student])
   );
 
-  const todaySchedules = data.schedules
-    .filter((schedule) => schedule.ativo && schedule.diasSemana.includes(currentDayKey) && activeStudentsMap[schedule.studentId])
+  const todaySchedules = expandSchedulesForDay(data.schedules.filter((schedule) => schedule.ativo), currentDayKey)
+    .filter((schedule) => activeStudentsMap[schedule.studentId])
     .sort((a, b) => a.horario.localeCompare(b.horario));
 
   const concludedLogsToday = data.logs.filter((log) => log.data === currentDateValue && log.concluido);
 
   const entries = todaySchedules.map((schedule) => {
     const student = activeStudentsMap[schedule.studentId];
-    const gym = data.gymsMap[schedule.gymId];
+    const gym = data.gymsMap[schedule.slotGymId || schedule.gymId];
     const template = data.templates.find((item) => item.studentId === schedule.studentId && item.diaSemana === currentDayKey);
     const log = concludedLogsToday.find((item) => item.studentId === schedule.studentId && item.horario === schedule.horario)
       || concludedLogsToday.find((item) => item.studentId === schedule.studentId);
@@ -286,7 +287,8 @@ async function renderStudents(pageEl) {
   const studentsWithExtras = sortByName(data.students).map((student) => {
     const gym = data.gymsMap[student.academiaPrincipalId];
     const schedules = data.schedules.filter((schedule) => schedule.studentId === student.id && schedule.ativo);
-    return { ...student, gym, schedulesCount: schedules.length };
+    const schedulesCount = schedules.reduce((sum, schedule) => sum + getScheduleSlots(schedule).length, 0);
+    return { ...student, gym, schedulesCount };
   });
 
   function draw() {
@@ -384,8 +386,9 @@ async function renderGyms(pageEl) {
 
   const gymsWithStats = sortByName(data.gyms).map((gym) => {
     const students = data.students.filter((student) => student.academiaPrincipalId === gym.id && student.status === STATUS.ACTIVE);
-    const schedules = data.schedules.filter((schedule) => schedule.gymId === gym.id && schedule.ativo);
-    return { ...gym, activeStudents: students.length, activeSchedules: schedules.length };
+    const schedules = data.schedules.filter((schedule) => schedule.ativo);
+    const activeSchedules = schedules.reduce((sum, schedule) => sum + getScheduleSlots(schedule).filter((slot) => (slot.gymId || schedule.gymId) === gym.id).length, 0);
+    return { ...gym, activeStudents: students.length, activeSchedules };
   });
 
   function draw() {
@@ -537,7 +540,7 @@ async function renderAgenda(pageEl) {
       buttonLabel: 'Nova agenda',
       buttonAttr: 'data-schedule-create',
       stats: [
-        { value: data.schedules.filter((item) => item.ativo).length, label: 'horários ativos' },
+        { value: data.schedules.filter((item) => item.ativo).reduce((sum, item) => sum + getScheduleSlots(item).length, 0), label: 'horários ativos' },
         { value: activeStudents.length, label: 'alunos ativos' }
       ]
     });
@@ -554,8 +557,7 @@ async function renderAgenda(pageEl) {
 
   function renderDay(dayKey) {
     pageEl.dataset.agendaSelectedDay = dayKey;
-    const daySchedules = data.schedules
-      .filter((schedule) => schedule.ativo && schedule.diasSemana.includes(dayKey))
+    const daySchedules = expandSchedulesForDay(data.schedules.filter((schedule) => schedule.ativo), dayKey)
       .filter((schedule) => data.studentsMap[schedule.studentId])
       .sort((a, b) => a.horario.localeCompare(b.horario));
 
@@ -571,7 +573,7 @@ async function renderAgenda(pageEl) {
     }, {});
 
     listEl.innerHTML = Object.entries(groupedByTime).sort((a,b)=>a[0].localeCompare(b[0])).map(([horario, schedules]) => {
-      const gym = data.gymsMap[schedules[0].gymId];
+      const gym = data.gymsMap[schedules[0].slotGymId || schedules[0].gymId];
       return `
         <section class="jp-time-group ${schedules.length > 1 ? 'is-shared' : ''}">
           <div class="jp-time-group-head">
@@ -648,7 +650,7 @@ async function renderSettings(pageEl) {
     countRecords(OBJECT_STORES.students),
     countRecords(OBJECT_STORES.gyms),
     countRecords(OBJECT_STORES.workoutLogs),
-    countRecords(OBJECT_STORES.schedules),
+Promise.resolve(data.schedules.reduce((sum, item) => sum + getScheduleSlots(item).length, 0)),
     countRecords(OBJECT_STORES.exercises)
   ]);
 

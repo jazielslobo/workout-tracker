@@ -1,5 +1,5 @@
 export const APP_NAME = 'Jeferson Personal';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.3.0';
 
 export const DB_NAME = 'jeferson-personal-db';
 export const DB_VERSION = 3;
@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS = {
   theme: 'ios-light',
   weekStartsOn: 'monday',
   onboardingCompleted: true,
-  seedVersionApplied: 'v1',
+  seedVersionApplied: 'v4',
   backupEnabled: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString()

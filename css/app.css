@@ -1490,3 +1490,116 @@ body[data-app-ready='true'] .view-main {
     flex-direction: column;
   }
 }
+
+.jp-weekday-time-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.jp-weekday-time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.92);
+  transition: all 0.2s ease;
+}
+
+.jp-weekday-time-row.is-active {
+  border-color: rgba(37, 99, 235, 0.32);
+  background: rgba(239, 246, 255, 0.95);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.08);
+}
+
+.jp-weekday-time-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.jp-weekday-time-check input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.jp-weekday-time-check strong {
+  font-size: 0.98rem;
+  color: #0f172a;
+}
+
+.jp-weekday-time-row input[type='time'] {
+  min-height: 44px;
+}
+
+
+body[data-app-ready="true"] .page {
+  animation: jpFadeIn 180ms ease-out;
+}
+
+.button,
+.jp-chip-filter,
+.jp-day-filter,
+.jp-link-chip,
+.jp-status-chip,
+.jp-badge-soft {
+  transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.button:active,
+.jp-chip-filter:active,
+.jp-day-filter:active {
+  transform: scale(0.98);
+}
+
+.jp-card,
+.jp-list-card,
+.jp-inline-card,
+.jp-time-group,
+.jp-appointment-card,
+.jp-panel-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.jp-card-head h3,
+.jp-page-intro h2,
+.jp-time-group-head strong,
+.jp-inline-card strong {
+  line-height: 1.15;
+}
+
+.jp-card-actions .button-fill,
+.jp-inline-actions .button-fill,
+.jp-button-stack .button-fill,
+.jp-primary-btn {
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
+}
+
+.jp-form-section,
+.jp-page-header-card,
+.jp-search-card {
+  overflow: hidden;
+}
+
+.jp-search-input input::placeholder,
+.jp-field input::placeholder,
+.jp-field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.jp-mini-empty {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(248,250,252,0.92);
+  border: 1px dashed rgba(148,163,184,0.28);
+  color: var(--jp-text-soft);
+  font-size: 13px;
+}
+
+.jp-shell > .jp-section:first-child {
+  margin-top: 12px;
+}
