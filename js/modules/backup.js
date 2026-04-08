@@ -41,13 +41,11 @@ function downloadTextFile(filename, content, type = 'application/json') {
 
 function csvEscape(value = '') {
   const stringValue = String(value ?? '');
-  if (/[",
-;]/.test(stringValue)) {
+  if (/[",;\n\r]/.test(stringValue)) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
 }
-
 export async function exportFullBackup() {
   const stores = {};
   for (const storeName of BACKUP_STORES) {
