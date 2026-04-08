@@ -1,0 +1,28 @@
+{
+  "id": "./",
+  "name": "Jeferson Personal",
+  "short_name": "Jeferson",
+  "description": "App mobile-first para personal trainer gerenciar agenda, alunos, treinos, academias e exercícios.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f2f5fb",
+  "theme_color": "#0f172a",
+  "lang": "pt-BR",
+  "categories": ["health", "productivity", "sports"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

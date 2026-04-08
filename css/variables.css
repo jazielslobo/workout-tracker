@@ -1,0 +1,41 @@
+:root {
+  --jp-bg: #f2f5fb;
+  --jp-surface: rgba(255, 255, 255, 0.84);
+  --jp-surface-strong: #ffffff;
+  --jp-card: rgba(255, 255, 255, 0.92);
+  --jp-text: #0f172a;
+  --jp-text-soft: #64748b;
+  --jp-primary: #2563eb;
+  --jp-primary-strong: #1d4ed8;
+  --jp-accent: #22c55e;
+  --jp-warning: #f59e0b;
+  --jp-danger: #ef4444;
+  --jp-border: rgba(148, 163, 184, 0.18);
+  --jp-border-strong: rgba(148, 163, 184, 0.26);
+  --jp-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+  --jp-shadow-soft: 0 12px 32px rgba(15, 23, 42, 0.08);
+  --jp-radius-xl: 28px;
+  --jp-radius-lg: 22px;
+  --jp-radius-md: 18px;
+  --jp-radius-sm: 14px;
+  --jp-gradient: linear-gradient(135deg, #0f172a 0%, #1d4ed8 48%, #38bdf8 100%);
+
+  --f7-theme-color: var(--jp-primary);
+  --f7-bars-bg-color: rgba(255, 255, 255, 0.78);
+  --f7-bars-bg-color-rgb: 255, 255, 255;
+  --f7-navbar-bg-color: rgba(255, 255, 255, 0.78);
+  --f7-navbar-border-color: transparent;
+  --f7-toolbar-bg-color: rgba(255, 255, 255, 0.82);
+  --f7-toolbar-link-color: #64748b;
+  --f7-tabbar-link-active-color: var(--jp-primary);
+  --f7-page-bg-color: var(--jp-bg);
+  --f7-card-bg-color: var(--jp-card);
+  --f7-list-bg-color: rgba(255, 255, 255, 0.92);
+  --f7-list-border-color: transparent;
+  --f7-list-item-border-color: rgba(148, 163, 184, 0.14);
+  --f7-list-chevron-icon-color: #94a3b8;
+  --f7-sheet-bg-color: #fff;
+  --f7-dialog-bg-color: rgba(255, 255, 255, 0.96);
+  --f7-text-color: var(--jp-text);
+  --f7-font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
+}
